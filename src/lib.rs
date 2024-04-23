@@ -6,7 +6,7 @@
 #[cfg(any(feature = "alloc", test))]
 extern crate alloc;
 
-pub mod device;
+pub mod blk;
 mod hal;
 mod queue;
 pub mod transport;
