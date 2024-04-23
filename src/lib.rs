@@ -7,11 +7,11 @@
 extern crate alloc;
 
 pub mod blk;
-mod hal;
-mod queue;
+pub mod hal;
+pub mod queue;
 pub mod transport;
-mod virtio_impl;
-mod volatile;
+pub mod virtio_impl;
+pub mod volatile;
 
 use core::{
     fmt::{self, Display, Formatter},
