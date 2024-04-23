@@ -10,6 +10,7 @@ pub mod blk;
 mod hal;
 mod queue;
 pub mod transport;
+mod virtio_impl;
 mod volatile;
 
 use core::{

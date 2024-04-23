@@ -16,32 +16,6 @@ const SUPPORTED_FEATURES: BlkFeature = BlkFeature::RO
     .union(BlkFeature::RING_INDIRECT_DESC)
     .union(BlkFeature::RING_EVENT_IDX);
 
-/// Driver for a VirtIO block device.
-///
-/// This is a simple virtual block device, e.g. disk.
-///
-/// Read and write requests (and other exotic requests) are placed in the queue and serviced
-/// (probably out of order) by the device except where noted.
-///
-/// # Example
-///
-/// ```
-/// # use virtio_drivers::{Error, Hal};
-/// # use virtio_drivers::transport::Transport;
-/// use virtio_drivers::device::blk::{VirtIOBlk, SECTOR_SIZE};
-///
-/// # fn example<HalImpl: Hal, T: Transport>(transport: T) -> Result<(), Error> {
-/// let mut disk = VirtIOBlk::<HalImpl, _>::new(transport)?;
-///
-/// println!("VirtIO block device: {} kB", disk.capacity() * SECTOR_SIZE as u64 / 2);
-///
-/// // Read sector 0 and then copy it to sector 1.
-/// let mut buf = [0; SECTOR_SIZE];
-/// disk.read_blocks(0, &mut buf)?;
-/// disk.write_blocks(1, &buf)?;
-/// # Ok(())
-/// # }
-/// ```
 pub struct VirtIOBlk<H: Hal, T: Transport> {
     transport: T,
     queue: VirtQueue<H, { QUEUE_SIZE as usize }>,
@@ -178,63 +152,6 @@ impl<H: Hal, T: Transport> VirtIOBlk<H, T> {
         )
     }
 
-    /// Submits a request to read one or more blocks, but returns immediately without waiting for
-    /// the read to complete.
-    ///
-    /// # Arguments
-    ///
-    /// * `block_id` - The identifier of the first block to read.
-    /// * `req` - A buffer which the driver can use for the request to send to the device. The
-    ///   contents don't matter as `read_blocks_nb` will initialise it, but like the other buffers
-    ///   it needs to be valid (and not otherwise used) until the corresponding
-    ///   `complete_read_blocks` call. Its length must be a non-zero multiple of [`SECTOR_SIZE`].
-    /// * `buf` - The buffer in memory into which the block should be read.
-    /// * `resp` - A mutable reference to a variable provided by the caller
-    ///   to contain the status of the request. The caller can safely
-    ///   read the variable only after the request is complete.
-    ///
-    /// # Usage
-    ///
-    /// It will submit request to the VirtIO block device and return a token identifying
-    /// the position of the first Descriptor in the chain. If there are not enough
-    /// Descriptors to allocate, then it returns [`Error::QueueFull`].
-    ///
-    /// The caller can then call `peek_used` with the returned token to check whether the device has
-    /// finished handling the request. Once it has, the caller must call `complete_read_blocks` with
-    /// the same buffers before reading the response.
-    ///
-    /// ```
-    /// # use virtio_drivers::{Error, Hal};
-    /// # use virtio_drivers::device::blk::VirtIOBlk;
-    /// # use virtio_drivers::transport::Transport;
-    /// use virtio_drivers::device::blk::{BlkReq, BlkResp, RespStatus};
-    ///
-    /// # fn example<H: Hal, T: Transport>(blk: &mut VirtIOBlk<H, T>) -> Result<(), Error> {
-    /// let mut request = BlkReq::default();
-    /// let mut buffer = [0; 512];
-    /// let mut response = BlkResp::default();
-    /// let token = unsafe { blk.read_blocks_nb(42, &mut request, &mut buffer, &mut response) }?;
-    ///
-    /// // Wait for an interrupt to tell us that the request completed...
-    /// assert_eq!(blk.peek_used(), Some(token));
-    ///
-    /// unsafe {
-    ///   blk.complete_read_blocks(token, &request, &mut buffer, &mut response)?;
-    /// }
-    /// if response.status() == RespStatus::OK {
-    ///   println!("Successfully read block.");
-    /// } else {
-    ///   println!("Error {:?} reading block.", response.status());
-    /// }
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// # Safety
-    ///
-    /// `req`, `buf` and `resp` are still borrowed by the underlying VirtIO block device even after
-    /// this method returns. Thus, it is the caller's responsibility to guarantee that they are not
-    /// accessed before the request is completed in order to avoid data races.
     pub unsafe fn read_blocks_nb(
         &mut self,
         block_id: usize,
